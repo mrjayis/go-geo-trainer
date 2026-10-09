@@ -231,7 +231,7 @@ function renderCheat() {
   $('ploHow').innerHTML = isPLO()
     ? '<b>PLO:</b> you can bet at most pot, so the answer is capped at 100%. Potting every street gets it in from the flop up to SPR 13, and from the turn up to SPR 4. Deeper than that, the answer is just pot.'
     : '';
-  const sprs = [1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+  const sprs = [1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 13, 15, 20];
   let h = '<tr><th>SPR</th><th>Flop (3 streets)</th><th>Turn (2 streets)</th></tr>';
   const cell = (s, n) => { const g = geo(s, n); return isPLO() && g > 1 ? `100% <span style="color:var(--muted)">(geo ${(g * 100).toFixed(0)}%)</span>` : `${(g * 100).toFixed(0)}%`; };
   sprs.forEach(s => h += `<tr><td>${s}</td><td>${cell(s, 3)}</td><td>${cell(s, 2)}</td></tr>`);
