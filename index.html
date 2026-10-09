@@ -59,6 +59,12 @@
         <option value="3">Flop only</option>
         <option value="2">Turn only</option>
       </select></label></div>
+    <div><label>Stakes<br>
+      <select id="stakes">
+        <option value="1">Low (1/2)</option>
+        <option value="5" selected>Mid (5/10)</option>
+        <option value="25">High (25/50)</option>
+      </select></label></div>
     <div><label>Answer in<br>
       <select id="mode">
         <option value="pct">% of pot</option>
@@ -142,10 +148,12 @@ function newSpot() {
   const n = s === 'mix' ? (Math.random() < 0.5 ? 3 : 2) : Number(s);
   const [lo, hi] = $('spr').value.split('-').map(Number);
   const pots = [6, 8, 10, 12, 15, 18, 20, 24, 25, 30, 36, 40, 45, 50, 60, 75, 80, 100, 120, 150];
-  const pot = pots[Math.floor(Math.random() * pots.length)];
+  const mult = Number($('stakes').value);
+  const pot = pots[Math.floor(Math.random() * pots.length)] * mult;
   const spr = lo + Math.random() * (hi - lo);
   let stack = Math.round(pot * spr);
-  if (stack >= 50) stack = Math.round(stack / 5) * 5;
+  const step = stack >= 5000 ? 50 : stack >= 500 ? 25 : stack >= 50 ? 5 : 1;
+  stack = Math.max(step, Math.round(stack / step) * step);
   spot = { n, pot, stack, spr: stack / pot };
   answered = false;
   $('sStreet').textContent = streetName(n);
@@ -215,7 +223,7 @@ $('next').onclick = newSpot;
 $('guess').addEventListener('keydown', e => { if (e.key === 'Enter') answered ? newSpot() : check(); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && answered && document.activeElement !== $('guess')) newSpot(); });
 $('mode').onchange = () => { $('unit').textContent = $('mode').value === 'pct' ? '% pot' : 'chips'; $('guess').focus(); };
-['street', 'spr'].forEach(id => $(id).onchange = newSpot);
+['street', 'spr', 'stakes'].forEach(id => $(id).onchange = newSpot);
 $('reset').onclick = () => { stats = { n: 0, hits: 0, streak: 0, best: 0, errSum: 0 }; save(); renderStats(); };
 
 renderCheat(); renderStats(); newSpot();
