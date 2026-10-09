@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Go Geo Trainer</title>
+<style>
+  :root {
+    --bg: #0f1412; --panel: #18201c; --panel2: #1f2a25; --text: #e8efe9; --muted: #93a39a;
+    --accent: #3ccf8e; --bad: #ff6b6b; --warn: #ffc14d; --border: #2b3a33;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  label { font-size: 13px; color: var(--muted); }
+  select, input { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 15px; }
+  button { background: var(--accent); color: #062014; border: 0; border-radius: 8px; padding: 10px 16px;
+    font-weight: 600; font-size: 15px; cursor: pointer; }
+  button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .spot { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
+  .spot div { background: var(--panel2); border-radius: 10px; padding: 10px 4px; }
+  .spot .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .spot .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .answer-row { margin-top: 14px; }
+  .answer-row input { width: 140px; font-size: 20px; }
+  #feedback { margin-top: 14px; display: none; }
+  .verdict { font-size: 20px; font-weight: 700; }
+  .good { color: var(--accent); } .close { color: var(--warn); } .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; margin-top: 10px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+  .stats b { color: var(--text); font-size: 18px; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .hl { background: rgba(60,207,142,.12); }
+  @media (max-width: 520px) {
+    .spot { grid-template-columns: repeat(2, 1fr); }
+    .answer-row input { width: 110px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Go Geo Trainer</h1>
+  <div class="sub">Find the bet size that gets stacks in by the river with the same pot fraction every street.</div>
+
+  <div class="panel row">
+    <div><label>Street<br>
+      <select id="street">
+        <option value="mix">Flop + Turn</option>
+        <option value="3">Flop only</option>
+        <option value="2">Turn only</option>
+      </select></label></div>
+    <div><label>Answer in<br>
+      <select id="mode">
+        <option value="pct">% of pot</option>
+        <option value="chips">Chips</option>
+      </select></label></div>
+    <div><label>SPR range<br>
+      <select id="spr">
+        <option value="1-4">Low (1–4)</option>
+        <option value="1-12" selected>Mixed (1–12)</option>
+        <option value="4-20">Deep (4–20)</option>
+      </select></label></div>
+    <div><label>Tolerance<br>
+      <select id="tol">
+        <option value="5">±5% pot</option>
+        <option value="10" selected>±10% pot</option>
+        <option value="15">±15% pot</option>
+      </select></label></div>
+  </div>
+
+  <div class="panel">
+    <div class="spot">
+      <div><div class="k">Street</div><div class="v" id="sStreet">–</div></div>
+      <div><div class="k">Pot</div><div class="v" id="sPot">–</div></div>
+      <div><div class="k">Eff. stack</div><div class="v" id="sStack">–</div></div>
+      <div><div class="k">SPR</div><div class="v" id="sSpr">–</div></div>
+    </div>
+    <div class="row answer-row">
+      <input id="guess" type="number" inputmode="decimal" placeholder="?" autocomplete="off">
+      <span id="unit" style="color:var(--muted)">% pot</span>
+      <button id="check">Check</button>
+      <button id="next" class="secondary">Next spot</button>
+    </div>
+    <div id="feedback">
+      <div class="verdict" id="verdict"></div>
+      <div id="detail" style="margin-top:6px"></div>
+      <table id="path"></table>
+      <div class="note" id="plo"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="stats">
+      <div>Spots <b id="stN">0</b></div>
+      <div>Hit <b id="stHit">0%</b></div>
+      <div>Streak <b id="stStreak">0</b></div>
+      <div>Best <b id="stBest">0</b></div>
+      <div>Avg miss <b id="stErr">–</b></div>
+      <button class="secondary" id="reset" style="padding:4px 10px;font-size:13px">Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <details>
+      <summary>How it works + cheat sheet</summary>
+      <p class="note" style="font-size:14px">
+        After a pot-fraction bet <i>f</i> is called, the pot grows by a factor of <b>(1 + 2f)</b>.
+        To go from pot <i>P</i> to all-in (pot <i>P + 2S</i>) over <i>N</i> streets:<br><br>
+        <b>f = ((1 + 2·SPR)<sup>1/N</sup> − 1) / 2</b><br><br>
+        Flop → N = 3, Turn → N = 2. Shortcut: find the growth multiplier <i>m</i> with
+        m<sup>N</sup> ≈ 1 + 2·SPR, then bet (m − 1)/2 pot.
+      </p>
+      <table id="cheat"></table>
+    </details>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const geo = (spr, n) => (Math.pow(1 + 2 * spr, 1 / n) - 1) / 2;
+const streetName = n => n === 3 ? 'Flop' : 'Turn';
+const fmt = x => Number.isInteger(x) ? String(x) : x.toFixed(1);
+
+let spot = null, answered = false;
+let stats = load() || { n: 0, hits: 0, streak: 0, best: 0, errSum: 0 };
+
+function load() { try { return JSON.parse(localStorage.getItem('geoStats')); } catch { return null; } }
+function save() { try { localStorage.setItem('geoStats', JSON.stringify(stats)); } catch {} }
+
+function newSpot() {
+  const s = $('street').value;
+  const n = s === 'mix' ? (Math.random() < 0.5 ? 3 : 2) : Number(s);
+  const [lo, hi] = $('spr').value.split('-').map(Number);
+  const pots = [6, 8, 10, 12, 15, 18, 20, 24, 25, 30, 36, 40, 45, 50, 60, 75, 80, 100, 120, 150];
+  const pot = pots[Math.floor(Math.random() * pots.length)];
+  const spr = lo + Math.random() * (hi - lo);
+  let stack = Math.round(pot * spr);
+  if (stack >= 50) stack = Math.round(stack / 5) * 5;
+  spot = { n, pot, stack, spr: stack / pot };
+  answered = false;
+  $('sStreet').textContent = streetName(n);
+  $('sPot').textContent = pot;
+  $('sStack').textContent = stack;
+  $('sSpr').textContent = spot.spr.toFixed(1);
+  $('guess').value = '';
+  $('feedback').style.display = 'none';
+  $('guess').focus();
+}
+
+function check() {
+  if (!spot || answered) return;
+  const raw = parseFloat($('guess').value);
+  if (isNaN(raw)) return;
+  answered = true;
+  const mode = $('mode').value;
+  const f = geo(spot.spr, spot.n);
+  const guessF = mode === 'pct' ? raw / 100 : raw / spot.pot;
+  const errPct = Math.abs(guessF - f) * 100;   // miss measured in % of pot
+  const tol = Number($('tol').value);
+  const hit = errPct <= tol;
+
+  stats.n++; stats.errSum += errPct;
+  if (hit) { stats.hits++; stats.streak++; stats.best = Math.max(stats.best, stats.streak); }
+  else stats.streak = 0;
+  save(); renderStats();
+
+  const v = $('verdict');
+  v.className = 'verdict ' + (hit ? 'good' : errPct <= tol * 2 ? 'close' : 'bad');
+  v.textContent = hit ? 'Nice — on target' : (guessF > f ? 'Too big' : 'Too small');
+  $('detail').innerHTML =
+    `Geo size: <b>${(f * 100).toFixed(0)}% pot</b> = <b>${fmt(Math.round(f * spot.pot * 10) / 10)}</b> chips. ` +
+    `You said ${(guessF * 100).toFixed(0)}% (${(guessF * spot.pot).toFixed(1)} chips), off by ${errPct.toFixed(0)}% pot.`;
+
+  // Bet path to the river
+  let pot = spot.pot, stack = spot.stack, rows = '<tr><th>Street</th><th>Pot</th><th>Bet</th><th>Stack after</th></tr>';
+  const names = spot.n === 3 ? ['Flop', 'Turn', 'River'] : ['Turn', 'River'];
+  names.forEach((nm, i) => {
+    const bet = i === names.length - 1 ? stack : f * pot;
+    rows += `<tr${i === 0 ? ' class="hl"' : ''}><td>${nm}</td><td>${pot.toFixed(1)}</td>` +
+            `<td>${bet.toFixed(1)} (${(bet / pot * 100).toFixed(0)}%)</td><td>${(stack - bet).toFixed(1)}</td></tr>`;
+    pot += 2 * bet; stack -= bet;
+  });
+  $('path').innerHTML = rows;
+  $('plo').textContent = f > 1 ? 'Geo is bigger than pot — in PLO you can only bet pot here, so you can\'t get it in geometrically.' : '';
+  $('feedback').style.display = 'block';
+}
+
+function renderStats() {
+  $('stN').textContent = stats.n;
+  $('stHit').textContent = stats.n ? Math.round(stats.hits / stats.n * 100) + '%' : '0%';
+  $('stStreak').textContent = stats.streak;
+  $('stBest').textContent = stats.best;
+  $('stErr').textContent = stats.n ? (stats.errSum / stats.n).toFixed(1) + '%' : '–';
+}
+
+function renderCheat() {
+  const sprs = [1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+  let h = '<tr><th>SPR</th><th>Flop (3 streets)</th><th>Turn (2 streets)</th></tr>';
+  sprs.forEach(s => h += `<tr><td>${s}</td><td>${(geo(s, 3) * 100).toFixed(0)}%</td><td>${(geo(s, 2) * 100).toFixed(0)}%</td></tr>`);
+  $('cheat').innerHTML = h;
+}
+
+$('check').onclick = check;
+$('next').onclick = newSpot;
+$('guess').addEventListener('keydown', e => { if (e.key === 'Enter') answered ? newSpot() : check(); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && answered && document.activeElement !== $('guess')) newSpot(); });
+$('mode').onchange = () => { $('unit').textContent = $('mode').value === 'pct' ? '% pot' : 'chips'; $('guess').focus(); };
+['street', 'spr'].forEach(id => $(id).onchange = newSpot);
+$('reset').onclick = () => { stats = { n: 0, hits: 0, streak: 0, best: 0, errSum: 0 }; save(); renderStats(); };
+
+renderCheat(); renderStats(); newSpot();
+</script>
+</body>
+</html>
